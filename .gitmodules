@@ -1,0 +1,9 @@
+[submodule "chip-roms"]
+	path = chip-roms
+	url = https://github.com/kripod/chip8-roms.git
+[submodule "chip8-roms"]
+	path = chip8-roms
+	url = https://github.com/kripod/chip8-roms.git
+[submodule "chip8-test-rom"]
+	path = chip8-test-rom
+	url = https://github.com/corax89/chip8-test-rom.git
