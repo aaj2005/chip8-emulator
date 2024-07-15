@@ -35,6 +35,18 @@ typedef enum {
 } emulator_state_t;
 
 
+// CHIP8 instruction format
+typedef struct{
+    uint16_t opcode;    
+    uint16_t NNN;       // 12-bit address/constant
+    uint8_t NN;         // 8-bit constant
+    uint8_t N;          // 4-bit constant
+    uint8_t X;          // 4-bit register identifier
+    uint8_t Y;          // 4-bit register identifier
+    
+} instruction_t;
+
+
 // CHIP8 Machine object
 typedef struct {
 
@@ -48,6 +60,7 @@ typedef struct {
 
 
     uint16_t stack[12];        // subroutine stack
+    uint16_t *stack_ptr;       // stack pointer
     uint8_t V[16];             // data registers V0-VF
     uint16_t I;                // index register
     uint16_t PC;               // Program Counter
@@ -56,7 +69,7 @@ typedef struct {
     bool keypad[16];           // hexadecimal keypad 0x0-0xF
     const char *rom_name;      // currently running ROM
     
-
+    instruction_t inst;        // currently executing instruction
 
 } chip8_t;
 
@@ -104,7 +117,7 @@ bool set_config_from_args(config_t *config, const int argc, char **argv){
         .window_width = 64,     // CHIP8 original X resolution
         .window_height = 32,    // CHIP8 original Y resolution
         .fg_color = 0xFFFFFFFF, // WHITE
-        .bg_color = 0xFFFF00FF, // YELLOW
+        .bg_color = 0x000000FF, // BLACK
         .scale_factor = 20,     // Default resolution will be 1280x640
     };
 
@@ -185,6 +198,7 @@ bool init_chip8(chip8_t *chip8, const char rom_name[]){
     chip8->state = RUNNING;     // Default machine state to on/running 
     chip8->PC = entry_point;    // start pc at ROM entry point
     chip8->rom_name = rom_name;
+    chip8->stack_ptr = &chip8->stack[0];
 
     return true; // success
 } 
@@ -224,6 +238,17 @@ void handle_input(chip8_t *chip8){
                         //escape key; exit window & end program
                         chip8->state = QUIT;
                         return;
+                    case SDLK_SPACE:
+                        // Space bar - pause emulator
+                        if (chip8->state == RUNNING){
+                            chip8->state = PAUSED; //pause
+                            puts("=====PAUSED=====");
+
+                        }else{
+                            chip8->state = RUNNING; // resume
+                        }
+                        return;
+
                     default:
                         break;
                 }
@@ -239,8 +264,56 @@ void handle_input(chip8_t *chip8){
 }
 
 
-int main(int argc, char **argv){
+// Emulate 1 CHIP8 instruction
+void emulate_instruction(chip8_t *chip8){
+    // since x86 is little endian and chip 8 is big endian
+    // get next opcode from ROM/ram
+    chip8->inst.opcode = (chip8->ram[chip8->PC] << 8) | chip8 -> ram[chip8->PC+1];
+    chip8->PC +=2; // preincrement PC for next opcode -- 2 bytes 
 
+    // fill out current instruction format
+    // DXYN
+    chip8->inst.NNN = chip8->inst.opcode & 0x0FFF;
+    chip8->inst.NN = chip8->inst.opcode & 0x0FF;
+    chip8->inst.N = chip8->inst.opcode & 0x0F;
+    chip8->inst.X = (chip8->inst.opcode >> 8) & 0x0F; // right bit shift by 8 to get bits 9-12 
+    chip8->inst.Y = (chip8->inst.opcode >> 4) & 0x0F; // right bit shift by 4 to get bits 5-8
+
+    //emulate opcode 
+    switch ((chip8->inst.opcode >> 12) & 0x0F){ // get top 4 MSBs
+        case 0x00:
+            if ( chip8->inst.NN == 0xE0){
+                //0x00E0: clear screen
+                memset(&chip8->display[0], false, sizeof chip8->display);
+            } else if (chip8->inst.NN == 0xEE){
+                // 0x0EEE: return from subroutine
+                // Set PC to  last address on subroutine stack ("pop" it off the stack )
+                //  so next opcode is retrieved from that address
+                chip8->PC = *--chip8->stack_ptr;
+            }
+            break;
+        case 0x02:
+            // 0x2NNN: Call subroutine at NNN
+            // store current address to return to on subroutine stack ("push" it on the stack)
+            //   and set PC to subroutine address so next opcode is gotten from there
+            *chip8->stack_ptr++ = chip8->PC; 
+            chip8->PC = chip8->inst.NNN;
+            break;
+        default:
+            break; //unimplemented or invalid opcode
+    }
+
+}
+
+
+
+
+int main(int argc, char **argv){
+    // default message usage for args
+    if (argc < 2){
+        fprintf(stderr, "Usage: %s <rom_name>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
     // initialise emulator configuration/options
     config_t config = {0};
     if (!set_config_from_args(&config, argc, argv)) {exit(EXIT_FAILURE);}
@@ -262,10 +335,13 @@ int main(int argc, char **argv){
     while(chip8.state != QUIT){
         // Handle user_input
         handle_input(&chip8);
-        // if (chip8.state == PAUSED) continue;
+        if (chip8.state == PAUSED) continue;
 
         // Get_time()
+
         // Emulate CHIP8 instructions
+        emulate_instruction(&chip8);
+
         // Get_time() elapsed since last Get_time()
         // Delay for approximately 60hz/60fps
         SDL_Delay(16); // time in ms 
