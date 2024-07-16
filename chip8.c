@@ -265,7 +265,7 @@ void handle_input(chip8_t *chip8){
 
 #ifdef DEBUG
 void print_debug_info(chip8_t *chip8){
-    printf("Address: 0x%04X, Opcode: 0x%04x Desc:",chip8->PC-2, chip8->inst.opcode);
+    printf("Address: 0x%04X, Opcode: 0x%04x Desc: ",chip8->PC-2, chip8->inst.opcode);
     switch ((chip8->inst.opcode >> 12) & 0x0F){ // get top 4 MSBs
         case 0x00:
             if ( chip8->inst.NN == 0xE0){
@@ -278,6 +278,8 @@ void print_debug_info(chip8_t *chip8){
                 //  so next opcode is retrieved from that address
                 printf("Return from subroutine to address 0x%04X\n", *(chip8->stack_ptr-1));
                 chip8->PC = *--chip8->stack_ptr;
+            }else{
+                printf("Unimplemented opcode\n");
             }
             break;
         case 0x02:
@@ -286,6 +288,15 @@ void print_debug_info(chip8_t *chip8){
             //   and set PC to subroutine address so next opcode is gotten from there
             *chip8->stack_ptr++ = chip8->PC; 
             chip8->PC = chip8->inst.NNN;
+            break;
+        case 0x06:
+            // 0x06NN: Set register VX to NN
+            chip8->V[chip8->inst.X] = chip8->inst.NN;
+            break;
+        case 0x0A:
+            // 0x0ANNN: Set index register I to NNN
+            printf("Set I to NNN (0x%04X)\n", chip8->inst.NNN);
+            chip8->I  = chip8->inst.NNN;
             break;
         default:
             printf("Unimplemented opcode\n");
@@ -335,6 +346,14 @@ void emulate_instruction(chip8_t *chip8){
             //   and set PC to subroutine address so next opcode is gotten from there
             *chip8->stack_ptr++ = chip8->PC; 
             chip8->PC = chip8->inst.NNN;
+            break;
+        case 0x06:
+            // 0x06NN: Set register VX to NN
+            chip8->V[chip8->inst.X] = chip8->inst.NN;
+            break;
+        case 0x0A:
+            // 0x0ANNN: Set index register I to NNN
+            chip8->I  = chip8->inst.NNN;
             break;
         default:
             break; //unimplemented or invalid opcode
