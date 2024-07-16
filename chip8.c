@@ -263,6 +263,38 @@ void handle_input(chip8_t *chip8){
     }
 }
 
+#ifdef DEBUG
+void print_debug_info(chip8_t *chip8){
+    printf("Address: 0x%04X, Opcode: 0x%04x Desc:",chip8->PC-2, chip8->inst.opcode);
+    switch ((chip8->inst.opcode >> 12) & 0x0F){ // get top 4 MSBs
+        case 0x00:
+            if ( chip8->inst.NN == 0xE0){
+                //0x00E0: clear screen
+                printf("Clear screen\n");
+                memset(&chip8->display[0], false, sizeof chip8->display);
+            } else if (chip8->inst.NN == 0xEE){
+                // 0x0EEE: return from subroutine
+                // Set PC to  last address on subroutine stack ("pop" it off the stack )
+                //  so next opcode is retrieved from that address
+                printf("Return from subroutine to address 0x%04X\n", *(chip8->stack_ptr-1));
+                chip8->PC = *--chip8->stack_ptr;
+            }
+            break;
+        case 0x02:
+            // 0x2NNN: Call subroutine at NNN
+            // store current address to return to on subroutine stack ("push" it on the stack)
+            //   and set PC to subroutine address so next opcode is gotten from there
+            *chip8->stack_ptr++ = chip8->PC; 
+            chip8->PC = chip8->inst.NNN;
+            break;
+        default:
+            printf("Unimplemented opcode\n");
+            break; //unimplemented or invalid opcode
+    }
+
+}
+#endif
+
 
 // Emulate 1 CHIP8 instruction
 void emulate_instruction(chip8_t *chip8){
@@ -278,6 +310,11 @@ void emulate_instruction(chip8_t *chip8){
     chip8->inst.N = chip8->inst.opcode & 0x0F;
     chip8->inst.X = (chip8->inst.opcode >> 8) & 0x0F; // right bit shift by 8 to get bits 9-12 
     chip8->inst.Y = (chip8->inst.opcode >> 4) & 0x0F; // right bit shift by 4 to get bits 5-8
+
+    #ifdef DEBUG
+        print_debug_info(chip8);
+    #endif
+
 
     //emulate opcode 
     switch ((chip8->inst.opcode >> 12) & 0x0F){ // get top 4 MSBs
