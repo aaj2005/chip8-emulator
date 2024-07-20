@@ -318,6 +318,10 @@ void print_debug_info(chip8_t *chip8){
                 printf("Unimplemented opcode\n");
             }
             break;
+        case 0x01:
+            // 0x1NNN: Jumps to address NNN
+            printf("Jump to address NNN (0x%04X)\n", chip8->inst.NNN);
+            break;
         case 0x02:
             // 0x2NNN: Call subroutine at NNN
             // store current address to return to on subroutine stack ("push" it on the stack)
@@ -391,6 +395,10 @@ void emulate_instruction(chip8_t *chip8, config_t config){
                 chip8->PC = *--chip8->stack_ptr;
             }
             break;
+        case 0x01:
+            // 0x1NNN: Jumps to address NNN
+            chip8->PC = chip8->inst.NNN; // set PC so that next opcode is from NNN
+            break;
         case 0x02:
             // 0x2NNN: Call subroutine at NNN
             // store current address to return to on subroutine stack ("push" it on the stack)
@@ -430,7 +438,7 @@ void emulate_instruction(chip8_t *chip8, config_t config){
                 X_coord = orig_X; // reset X for next row to draw
 
                 for (int8_t j = 7; j >= 0; j--){
-                    bool *pixel = &chip8->display[Y_coord * config.window_height + X_coord];
+                    bool *pixel = &chip8->display[Y_coord * config.window_width + X_coord];
                     const bool sprite_bit = sprite_data & ( 1 << j );
                     // if sprite pixel/bit is on and display pixel is on, set carry flag
                     if ( sprite_bit && *pixel) {
