@@ -25,6 +25,7 @@ typedef struct {
     uint32_t fg_color;      // Foreground Color RGBA8888 (bits)
     uint32_t bg_color;      // Background Color RGBA8888 (bits)
     uint32_t scale_factor;  // Amount to scale a CHIP8 pixel by ... e.g 20x will be a 20x larger window
+    bool pixel_outlines;    // Draw pixel outlines yes/no 
 } config_t;
 
 //Emulator states
@@ -119,6 +120,7 @@ bool set_config_from_args(config_t *config, const int argc, char **argv){
         .fg_color = 0xFFFFFFFF, // WHITE
         .bg_color = 0x000000FF, // BLACK
         .scale_factor = 20,     // Default resolution will be 1280x640
+        .pixel_outlines = true, // Draw pixel outlines by default
     };
 
     //override defaults from args
@@ -242,6 +244,15 @@ void update_screen(const sdl_t sdl, const config_t config, const chip8_t chip8){
             // If the pixel is on, draw foreground color
             SDL_SetRenderDrawColor(sdl.renderer, fg_r, fg_g, fg_b, fg_a);
             SDL_RenderFillRect(sdl.renderer, &rect);
+
+            // if user requested drawing pixel outlines, draw those here
+            if (config.pixel_outlines){
+                SDL_SetRenderDrawColor(sdl.renderer, bg_r, bg_g, bg_b, bg_a);
+                SDL_RenderDrawRect(sdl.renderer, &rect);
+
+            }
+
+
         }else{
             //Pixel is off, draw background color
             SDL_SetRenderDrawColor(sdl.renderer, bg_r, bg_g, bg_b, bg_a);
