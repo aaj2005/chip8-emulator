@@ -335,7 +335,6 @@ void print_debug_info(chip8_t *chip8){
             printf("Set I to NNN (0x%04X)\n", chip8->inst.NNN);
             break;
         case 0x0D:
-            case 0x0D:
             // 0xDXYN: Draw N height sprite at coordinates X,Y; read from mem location I;
             // screen pixels are xor'd with sprite bits 
             // VF (carry flag) is set if any screen pixels are set off; useful for 
