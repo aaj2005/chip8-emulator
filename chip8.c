@@ -291,12 +291,12 @@ void print_debug_info(chip8_t *chip8){
             break;
         case 0x06:
             // 0x06NN: Set register VX to NN
-            chip8->V[chip8->inst.X] = chip8->inst.NN;
+            printf("Set register V%X to NN (0x%2X)\n",
+            chip8->inst.X, chip8->inst.NN);
             break;
         case 0x0A:
             // 0x0ANNN: Set index register I to NNN
             printf("Set I to NNN (0x%04X)\n", chip8->inst.NNN);
-            chip8->I  = chip8->inst.NNN;
             break;
         default:
             printf("Unimplemented opcode\n");
@@ -308,7 +308,7 @@ void print_debug_info(chip8_t *chip8){
 
 
 // Emulate 1 CHIP8 instruction
-void emulate_instruction(chip8_t *chip8){
+void emulate_instruction(chip8_t *chip8, config_t config){
     // since x86 is little endian and chip 8 is big endian
     // get next opcode from ROM/ram
     chip8->inst.opcode = (chip8->ram[chip8->PC] << 8) | chip8 -> ram[chip8->PC+1];
@@ -355,6 +355,47 @@ void emulate_instruction(chip8_t *chip8){
             // 0x0ANNN: Set index register I to NNN
             chip8->I  = chip8->inst.NNN;
             break;
+        case 0x0D:
+            // 0xDXYN: Draw N height sprite at coordinates X,Y; read from mem location I;
+            // screen pixels are xor'd with sprite bits 
+            // VF (carry flag) is set if any screen pixels are set off; useful for 
+            // collision detections and other stuff
+
+            uint8_t X_coord = chip8->V[chip8->inst.X] % config.window_width; 
+            uint8_t Y_coord = chip8->V[chip8->inst.Y] % config.window_height;
+            const uint8_t orig_X = X_coord; // original X value
+
+
+            chip8->V[0xF] = 0; // initialise carry flag to 0
+
+            // loop over all N rows of the sprite
+            for ( uint8_t i = 0; i< chip8->inst.N;i++){
+                // get next byte/ row of sprite data
+                const uint8_t sprite_data = chip8->ram[chip8->I + i];
+                X_coord = orig_X; // reset X for next row to draw
+
+                for (int8_t j = 7; j >= 0; j--){
+                    bool *pixel = &chip8->display[Y_coord * config.window_width + X_coord];
+                    const bool sprite_bit = sprite_data & ( 1 << j );
+                    // if sprite pixel/bit is on and display pixel is on, set carry flag
+                    if ( sprite_bit && *pixel) {
+
+                        chip8->V[0xF] = 1;
+
+                    }
+
+                    // XOR display pixel with sprite pixel/bit to set it on/off
+                    *pixel ^= sprite_bit;
+
+                    // stop drawing if hit right edge of screen
+                    if(++X_coord >= config.window_width) break; 
+                }
+
+                // stop drawing entire sprite if hit bottom edge of screen
+                if (++Y_coord >= config.window_height) break;
+            } 
+
+            break;
         default:
             break; //unimplemented or invalid opcode
     }
@@ -396,7 +437,7 @@ int main(int argc, char **argv){
         // Get_time()
 
         // Emulate CHIP8 instructions
-        emulate_instruction(&chip8);
+        emulate_instruction(&chip8, config);
 
         // Get_time() elapsed since last Get_time()
         // Delay for approximately 60hz/60fps
