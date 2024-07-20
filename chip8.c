@@ -327,8 +327,14 @@ void print_debug_info(chip8_t *chip8){
             break;
         case 0x06:
             // 0x06NN: Set register VX to NN
-            printf("Set register V%X to NN (0x%2X)\n",
+            printf("Set register V%X = NN (0x%2X)\n",
             chip8->inst.X, chip8->inst.NN);
+            break;
+        case 0x07:
+            // 0x07XNN: Set register VX += NN
+            printf("Set register V%X (0x%02X) += NN (%0x2X). Result 0x%02XN \n",
+            chip8->inst.X, chip8->V[chip8->inst.X], chip8->inst.NN,
+            chip8->V[chip8->inst.X] +chip8->inst.NN );
             break;
         case 0x0A:
             // 0x0ANNN: Set index register I to NNN
@@ -396,6 +402,10 @@ void emulate_instruction(chip8_t *chip8, config_t config){
             // 0x06NN: Set register VX to NN
             chip8->V[chip8->inst.X] = chip8->inst.NN;
             break;
+        case 0x07:
+            // 0x07XNN: Set register VX += NN
+            chip8->V[chip8->inst.X] += chip8->inst.NN;
+            break;
         case 0x0A:
             // 0x0ANNN: Set index register I to NNN
             chip8->I  = chip8->inst.NNN;
@@ -420,7 +430,7 @@ void emulate_instruction(chip8_t *chip8, config_t config){
                 X_coord = orig_X; // reset X for next row to draw
 
                 for (int8_t j = 7; j >= 0; j--){
-                    bool *pixel = &chip8->display[Y_coord * config.window_width + X_coord];
+                    bool *pixel = &chip8->display[Y_coord * config.window_height + X_coord];
                     const bool sprite_bit = sprite_data & ( 1 << j );
                     // if sprite pixel/bit is on and display pixel is on, set carry flag
                     if ( sprite_bit && *pixel) {
