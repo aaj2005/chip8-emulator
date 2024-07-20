@@ -235,8 +235,8 @@ void update_screen(const sdl_t sdl, const config_t config, const chip8_t chip8){
         // translate 1D index i value to 2D XY coordinates
         // X = i % window_width
         // Y = i / window_width
-        rect.x = i % config.window_width;
-        rect.y = i / config.window_width;
+        rect.x = (i % config.window_width) * config.scale_factor;
+        rect.y = (i / config.window_width) * config.scale_factor;
 
         if (chip8.display[i]){
             // If the pixel is on, draw foreground color
@@ -340,7 +340,7 @@ void print_debug_info(chip8_t *chip8){
             // VF (carry flag) is set if any screen pixels are set off; useful for 
             // collision detections and other stuff
             printf("Draw N (%u) height sprite at coords V%X (0x%02X), V%X (0x%02X)"
-             "from memory location I (%04X). Set VF = 1 if any pixels are turned off   ",
+             "from memory location I (%04X). Set VF = 1 if any pixels are turned off\n",
              chip8->inst.N, chip8->inst.X, chip8->V[chip8->inst.X], chip8->inst.Y, chip8->V[chip8->inst.Y], chip8->I );
             break;
         default:
