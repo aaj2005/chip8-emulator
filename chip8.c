@@ -269,6 +269,11 @@ void update_screen(const sdl_t sdl, const config_t config, const chip8_t chip8){
 }
 
 // Handle user input
+// CHIP8 Keypad     QWERTY
+// 123C             1234
+// 456D             qwer
+// 789E             asdf
+// A0BF             zxcv
 void handle_input(chip8_t *chip8){
     SDL_Event event;
     
@@ -296,13 +301,58 @@ void handle_input(chip8_t *chip8){
                             chip8->state = RUNNING; // resume
                         }
                         return;
+                    // map qwerty keys to chip8 keypad
+                    case SDLK_1: chip8->keypad[0x01] = true; break;
+                    case SDLK_2: chip8->keypad[0x02] = true; break;
+                    case SDLK_3: chip8->keypad[0x03] = true; break;
+                    case SDLK_4: chip8->keypad[0x0C] = true; break;
 
+                    case SDLK_q: chip8->keypad[0x04] = true; break;
+                    case SDLK_w: chip8->keypad[0x05] = true; break;
+                    case SDLK_e: chip8->keypad[0x06] = true; break;
+                    case SDLK_r: chip8->keypad[0x0D] = true; break;
+
+                    case SDLK_a: chip8->keypad[0x07] = true; break;
+                    case SDLK_s: chip8->keypad[0x08] = true; break;
+                    case SDLK_d: chip8->keypad[0x09] = true; break;
+                    case SDLK_f: chip8->keypad[0x0E] = true; break;
+
+                    case SDLK_z: chip8->keypad[0x0A] = true; break;
+                    case SDLK_x: chip8->keypad[0x00] = true; break;
+                    case SDLK_c: chip8->keypad[0x0B] = true; break;
+                    case SDLK_v: chip8->keypad[0x0F] = true; break;
+                    
                     default:
                         break;
                 }
                 break;
 
             case SDL_KEYUP:  
+                switch(event.key.keysym.sym){
+                    // map qwerty keys to chip8 keypad
+                    case SDLK_2: chip8->keypad[0x02] = false; break;
+                    case SDLK_1: chip8->keypad[0x01] = false; break;
+                    case SDLK_3: chip8->keypad[0x03] = false; break;
+                    case SDLK_4: chip8->keypad[0x0C] = false; break;
+
+                    case SDLK_q: chip8->keypad[0x04] = false; break;
+                    case SDLK_w: chip8->keypad[0x05] = false; break;
+                    case SDLK_e: chip8->keypad[0x06] = false; break;
+                    case SDLK_r: chip8->keypad[0x0D] = false; break;
+
+                    case SDLK_a: chip8->keypad[0x07] = false; break;
+                    case SDLK_s: chip8->keypad[0x08] = false; break;
+                    case SDLK_d: chip8->keypad[0x09] = false; break;
+                    case SDLK_f: chip8->keypad[0x0E] = false; break;
+
+                    case SDLK_z: chip8->keypad[0x0A] = false; break;
+                    case SDLK_x: chip8->keypad[0x00] = false; break;
+                    case SDLK_c: chip8->keypad[0x0B] = false; break;
+                    case SDLK_v: chip8->keypad[0x0F] = false; break;
+                    
+                    default:
+                        break;
+                }
                 break;
 
             default:
@@ -687,7 +737,7 @@ void emulate_instruction(chip8_t *chip8, config_t config){
         case 0xE:
             if (chip8->inst.NN == 0x9E){
                 // 0xEX9E: skip next instruction if key in VX is pressed 
-                if (chip8->keypad[chip8->V[chip->inst.X]]){
+                if (chip8->keypad[chip8->V[chip8->inst.X]]){
                     chip8->PC+=2;
                 }
 
@@ -695,13 +745,39 @@ void emulate_instruction(chip8_t *chip8, config_t config){
 
             }else if(chip8->inst.NN == 0xA1){
                 // 0xEX9E: skip next instruction if key in VX is not pressed
-                if (!chip8->keypad[chip8->V[chip->inst.X]]){
+                if (!chip8->keypad[chip8->V[chip8->inst.X]]){
                     chip8->PC+=2;
                 }
 
 
             }
             break;
+        
+        case 0xF:
+            switch(chip8->inst.NN){
+                case 0x0A:
+                    // 0xFX0A: VX = getkey(); Await until a keypress, and store in VX
+                    bool any_key_pressed = false;
+                    for (uint8_t i=0; i < sizeof chip8->keypad;i++){
+                        if (chip8->keypad[i]){
+                            chip8->V[chip8->inst.X]  = i; // i = key (offset into keypad array)
+                            any_key_pressed = true;
+                            break;
+                        }
+                    }
+                    // if no key has been pressed, 
+                    //  keep getting the current the opcode and running this instruction
+                    if (!any_key_pressed){
+                        chip8->PC-=2; 
+                    }
+
+
+                    break;
+
+                default:
+                    break;
+            }
+        
         default:
             break; //unimplemented or invalid opcode
     }
