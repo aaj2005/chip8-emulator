@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <time.h>
 
 
 /* SDL (Simple Direct Media Layer) is a library that abstracts multimedia hardware components 
@@ -347,12 +348,12 @@ void print_debug_info(chip8_t *chip8){
             break;
         case 0x04:
             // 0x4XNN: Skips next instruction if VX does not equal NN
-            printf("Check if V%X (0x%02X) == NN (0x%02X), skip next instruction if false",
+            printf("Check if V%X (0x%02X) == NN (0x%02X), skip next instruction if false\n",
                 chip8->inst.X, chip8->V[chip8->inst.X], chip8->inst.NN);
             break;
         case 0x05:
             // 0x5XY0: Skips next instruction if VX equals VY
-            printf("Check if V%X (0x%02X) == V%X (0x%02X), skip next instruction if true",
+            printf("Check if V%X (0x%02X) == V%X (0x%02X), skip next instruction if true\n",
                 chip8->inst.X, chip8->V[chip8->inst.X], chip8->inst.Y, chip8->V[chip8->inst.Y]);
             break;
         case 0x06:
@@ -451,8 +452,13 @@ void print_debug_info(chip8_t *chip8){
             break;
         case 0x0B:
             // 0xBNNN: Jumps to the address NNN plux V0
-            printf("Set PC to V0 (0x%02X) + NNN (0x%04X); Result = 0x%04X",
+            printf("Set PC to V0 (0x%02X) + NNN (0x%04X); Result = 0x%04X\n",
                 chip8->V[0], chip8->inst.NNN, chip8->V[0] + chip8->inst.NNN);
+            break;
+        case 0x0C:
+            // 0xCXNN: Sets register VX = rand() % 256 & NN (bitwise AND)
+            printf("Set V%X = rand() %% 256 & NN (0x%02X)\n", chip8->inst.X, chip8->inst.NN);
+            chip8->V[chip8->inst.X] = rand() % 256 & chip8->inst.NN;
             break;
         case 0x0D:
             // 0xDXYN: Draw N height sprite at coordinates X,Y; read from mem location I;
@@ -462,6 +468,19 @@ void print_debug_info(chip8_t *chip8){
             printf("Draw N (%u) height sprite at coords V%X (0x%02X), V%X (0x%02X)"
              "from memory location I (%04X). Set VF = 1 if any pixels are turned off\n",
              chip8->inst.N, chip8->inst.X, chip8->V[chip8->inst.X], chip8->inst.Y, chip8->V[chip8->inst.Y], chip8->I );
+            break;
+        case 0xE:
+            if (chip8->inst.NN == 0x9E){
+                // 0xEX9E: skip next instruction if key in VX is pressed 
+                printf("Skip next instruction if key in V%X (0x%02X) is pressed; Keypad value %d\n", 
+                    chip8->inst.X, chip8->V[chip8->inst.X], chip8->keypad[chip8->V[chip8->inst.X]]);
+
+            }else if(chip8->inst.NN == 0xA1){
+                // 0xEX9E: skip next instruction if key in VX is not pressed
+                printf("Skip next instruction if key in V%X (0x%02X) is not pressed; Keypad value %d\n", 
+                    chip8->inst.X, chip8->V[chip8->inst.X], chip8->keypad[chip8->V[chip8->inst.X]]);
+
+            }
             break;
         default:
             printf("Unimplemented opcode\n");
@@ -619,6 +638,10 @@ void emulate_instruction(chip8_t *chip8, config_t config){
             // 0xBNNN: Jumps to the address NNN plux V0
             chip8->PC = chip8->V[0x0] + chip8->inst.NNN;
             break;
+        case 0x0C:
+            // 0xCXNN: Sets register VX = rand() % 256 & NN (bitwise AND)
+            chip8->V[chip8->inst.X] = (rand() % 256) & chip8->inst.NN;
+            break;
         case 0x0D:
             // 0xDXYN: Draw N height sprite at coordinates X,Y; read from mem location I;
             // screen pixels are xor'd with sprite bits 
@@ -657,8 +680,27 @@ void emulate_instruction(chip8_t *chip8, config_t config){
 
                 // stop drawing entire sprite if hit bottom edge of screen
                 if (++Y_coord >= config.window_height) break;
-            } 
+            }
 
+            break;
+
+        case 0xE:
+            if (chip8->inst.NN == 0x9E){
+                // 0xEX9E: skip next instruction if key in VX is pressed 
+                if (chip8->keypad[chip8->V[chip->inst.X]]){
+                    chip8->PC+=2;
+                }
+
+                
+
+            }else if(chip8->inst.NN == 0xA1){
+                // 0xEX9E: skip next instruction if key in VX is not pressed
+                if (!chip8->keypad[chip8->V[chip->inst.X]]){
+                    chip8->PC+=2;
+                }
+
+
+            }
             break;
         default:
             break; //unimplemented or invalid opcode
@@ -691,6 +733,9 @@ int main(int argc, char **argv){
     
     // Initial screen clear
     clear_screen(sdl, config);
+
+    // setup random value seed
+    srand(time(NULL));
 
     //Main emulator loop
     while(chip8.state != QUIT){
