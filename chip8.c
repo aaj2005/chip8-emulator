@@ -532,6 +532,63 @@ void print_debug_info(chip8_t *chip8){
 
             }
             break;
+        case 0xF:
+            switch(chip8->inst.NN){
+                case 0x0A:
+                    // 0xFX0A: VX = getkey(); Await until a keypress, and store in VX
+                    printf("Await until a key is pressed; Store key in V%X\n",
+                        chip8->inst.X);
+                    break;
+
+                case 0x1E:
+                    // 0FX1E: I+= VX; Add VX to register I. For non-Amiga CHIP8, does not affect VF 
+                    printf("I (0%04X) += V%X (0x%02X); Result (I): 0x%04X\n",
+                        chip8->I, chip8->inst.X, chip8->V[chip8->inst.X],
+                         chip8->I + chip8->V[chip8->inst.X]);
+                    break;
+                case 0x07:
+                    // 0xFX07: set VX to the value of delay timer
+                    printf("Set V%x = delay timer (0x%02X)\n",
+                        chip8->inst.X, chip8->delay_timer);
+                    break;
+
+                case 0x15:
+                    // 0xFX15: set delay timer to value of VX
+                    printf("Set Delay Timer = V%x (0x%02X) \n",
+                         chip8->inst.X, chip8->V[chip8->inst.X]);
+                    break;
+                
+                case 0x18:
+                    // 0xFX18: set VX to the value of sound timer
+                    printf("Set Sound Timer = V%x (0x%02X) \n",
+                         chip8->inst.X, chip8->V[chip8->inst.X]);
+                    break;
+                case 0x29:
+                    // 0xFX29: set register I to sprite location in memory for character in VX (0x0-0xF)
+                    printf("Set I to sprite location in memory for character in V%X (0x%2X). Result (VX*5) = (0x%2X) \n",
+                        chip8->inst.X, chip8->V[chip8->inst.X], chip8->V[chip8->inst.X] *5);
+                    break;
+                case 0x33:
+                    // 0xFX33: Store BCD (binary coded decimal) representation of VX at memory offset from I;
+                    //      I = hundred's place, I + 1 = ten's place, I + 2 = one's place
+                    printf("Store the BCD representation of V%X (0x%02X) at memory from I (0x%04X)\n",
+                        chip8->inst.X, chip8->V[chip8->inst.X], chip8->I);
+                    break;
+                case 0x55:
+                    // 0xFX55: Register dump V0-VF inclusive to memory offset from I;
+                    // SCHIP does not increment I, CHIP8 does increment I
+                    printf("Register dump V0-V%X (0x%02X) inclusive at memory offset from I (0x%04X)\n",
+                        chip8->inst.X, chip8->V[chip8->inst.X], chip8->I);
+                    break;
+                case 0x65:
+                    // 0xFX65: Register load V0-VF from memory offset from I;
+                    // SCHIP does not increment I, CHIP8 does increment I
+                    printf("Register load V0-V%X (0x%02X) from memory offset from I (0x%04X)\n",
+                        chip8->inst.X, chip8->V[chip8->inst.X], chip8->I);
+                default:
+                    break;
+            }
+            break;
         default:
             printf("Unimplemented opcode\n");
             break; //unimplemented or invalid opcode
@@ -601,7 +658,6 @@ void emulate_instruction(chip8_t *chip8, config_t config){
             break;
         case 0x05:
             // 0x5XY0: Skips next instruction if VX equals VY#
-            if (chip8->inst.NN !=0) break; // wrong opcode
             if (chip8->V[chip8->inst.X] == chip8->V[chip8->inst.Y]){
                 chip8->PC+=2;   //skip next opcode/instruction
             }
@@ -770,13 +826,65 @@ void emulate_instruction(chip8_t *chip8, config_t config){
                     if (!any_key_pressed){
                         chip8->PC-=2; 
                     }
-
-
                     break;
 
+                case 0x1E:
+                    // 0FX1E: I+= VX; Add VX to register I. For non-Amiga CHIP8, does not affect VF 
+                    chip8->I += chip8->V[chip8->inst.X];
+                    break;
+                
+                case 0x07:
+                    // 0xFX07: set VX to the value of delay timer
+                    chip8->V[chip8->inst.X] = chip8->delay_timer;
+                    break;
+
+                case 0x15:
+                    // 0xFX15: set delay timer to value of VX
+                    chip8->delay_timer = chip8->V[chip8->inst.X];
+                    break;
+                
+                case 0x18:
+                    // 0xFX18: set delay timer to value of VX
+                    chip8->sound_timer = chip8->V[chip8->inst.X];
+                    break;
+
+                case 0x29:
+                    // 0xFX29: set register I to sprite location in memory for character in VX (0x0-0xF)
+                    chip8->I = chip8->V[chip8->inst.X] * 5;
+                    break;
+                
+                case 0x33:
+                    // 0xFX33: Store BCD (binary coded decimal) representation of VX at memory offset from I;
+                    //      I = hundred's place, I + 1 = ten's place, I + 2 = one's place
+                    uint8_t bcd = chip8->V[chip8->inst.X];
+                    chip8->ram[chip8->I + 2] = bcd % 10;
+                    bcd /= 10;
+                    chip8->ram[chip8->I + 1] = bcd % 10; 
+                    bcd /= 10;
+                    chip8->ram[chip8->I] = bcd;
+                    break;
+
+                case 0x55:
+                    // 0xFX55: Register dump V0-VF inclusive to memory offset from I;
+                    // SCHIP does not increment I, CHIP8 does increment I
+                    // NOTE: Could make this a config flag to use SCHIP or CHIP8 logic for I
+                    for (uint8_t i =0; i <= chip8->inst.X; i++) {
+                        chip8->ram[chip8->I + i] = chip8 ->V[i];
+                    }
+                    break;
+
+                case 0x65:
+                    // 0xFX65: Register load V0-VF from memory offset from I;
+                    // SCHIP does not increment I, CHIP8 does increment I
+                    // NOTE: Could make this a config flag to use SCHIP or CHIP8 logic for I
+                    for (uint8_t i =0; i <= chip8->inst.X; i++) {
+                        chip8 ->V[i] = chip8->ram[chip8->I + i];
+                    }
+                    break;
                 default:
                     break;
             }
+            break;
         
         default:
             break; //unimplemented or invalid opcode
