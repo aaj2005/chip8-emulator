@@ -21,12 +21,13 @@ typedef struct {
 
 // Emulator Config object
 typedef struct {
-    uint32_t window_width;  // SDL window width
-    uint32_t window_height; // SDL window height
-    uint32_t fg_color;      // Foreground Color RGBA8888 (bits)
-    uint32_t bg_color;      // Background Color RGBA8888 (bits)
-    uint32_t scale_factor;  // Amount to scale a CHIP8 pixel by ... e.g 20x will be a 20x larger window
-    bool pixel_outlines;    // Draw pixel outlines yes/no 
+    uint32_t window_width;      // SDL window width
+    uint32_t window_height;     // SDL window height
+    uint32_t fg_color;          // Foreground Color RGBA8888 (bits)
+    uint32_t bg_color;          // Background Color RGBA8888 (bits)
+    uint32_t scale_factor;      // Amount to scale a CHIP8 pixel by ... e.g 20x will be a 20x larger window
+    bool pixel_outlines;        // Draw pixel outlines yes/no 
+    uint32_t inst_per_second;   // CHIP8 CPU "clock rate"/hz
 } config_t;
 
 //Emulator states
@@ -122,6 +123,7 @@ bool set_config_from_args(config_t *config, const int argc, char **argv){
         .bg_color = 0x000000FF, // BLACK
         .scale_factor = 20,     // Default resolution will be 1280x640
         .pixel_outlines = true, // Draw pixel outlines by default
+        .inst_per_second = 500, // Number of intructions to emulate in 1 second (clock rate of CPU)
     };
 
     //override defaults from args
@@ -196,6 +198,10 @@ bool init_chip8(chip8_t *chip8, const char rom_name[]){
     }
 
     fclose(rom);
+    for(uint64_t i = 0; i < sizeof(chip8->ram)/sizeof(uint8_t); i+=2) {
+        printf("%ld: 0x%0X%0X\n",i,chip8->ram[i],chip8->ram[i+1]);
+    } 
+    printf("%ld",rom_size);
 
     //set chip8 machine defaults
     chip8->state = RUNNING;     // Default machine state to on/running 
@@ -892,7 +898,20 @@ void emulate_instruction(chip8_t *chip8, config_t config){
 
 }
 
+// Update CHIP8 delay and sound timers every 60hz
+void update_timers(chip8_t* chip8){
+    if (chip8->delay_timer > 0){
+        chip8->delay_timer--;
+    }
+    if (chip8->sound_timer > 0){
+        chip8->sound_timer--;
+        //setup sound 
 
+    }else{
+        // stop playing sound
+    
+    }
+}
 
 
 int main(int argc, char **argv){
@@ -927,16 +946,30 @@ int main(int argc, char **argv){
         handle_input(&chip8);
         if (chip8.state == PAUSED) continue;
 
-        // Get_time()
+        // Get_time before running instructions 
+        const uint64_t start_frame_time = SDL_GetPerformanceCounter();
 
-        // Emulate CHIP8 instructions
-        emulate_instruction(&chip8, config);
+        // Emulate CHIP8 instructions for this emulator "frame" (60hz)
+        for (uint32_t i = 0; i< config.inst_per_second / 60 ;i++)
+            emulate_instruction(&chip8, config);
 
-        // Get_time() elapsed since last Get_time()
-        // Delay for approximately 60hz/60fps
-        SDL_Delay(16); // time in ms 
+        // Get_time elapsed after running instructions 
+        const uint64_t end_frame_time = SDL_GetPerformanceCounter();
+
+
+        // Delay for approximately 60hz/60fps (16.67) or actual time elapsed
+        double time_elapsed = (double) ((end_frame_time - start_frame_time) / 1000) / SDL_GetPerformanceFrequency();
+
+
+        // SDL_Delay(16 - actual time elapsed) 
+        SDL_Delay(16.67f > time_elapsed ? 16.67f - time_elapsed : 0); // time in ms 
+
+
         // Update window with changes
         update_screen(sdl, config, chip8);
+        
+        // Update delay and sound timers every 60hz
+        update_timers(&chip8);
 
     }
     
